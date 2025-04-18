@@ -9,5 +9,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AnimatePresence: typeof import('motion-v')['AnimatePresence']
+    Sidebar: typeof import('./src/components/Sidebar.vue')['default']
+    SidebarComponent: typeof import('./src/components/SidebarComponent.vue')['default']
   }
 }

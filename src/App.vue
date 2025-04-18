@@ -1,77 +1,30 @@
 <script setup>
 import { reactive, computed, ref, onMounted, watch } from "vue";
 import { toast } from "vue3-toastify";
-import { motion, AnimatePresence } from "motion-v";
+import { marked } from "marked";
+import SidebarComponent from "./components/SidebarComponent.vue";
+import axios from "axios";
+import { useTemplateStore } from "./stores/templateStore";
+import { useMainStore } from "./stores/mainStore";
 
-const rawTemplates = ref(
-    localStorage.getItem("templates")
-        ? JSON.parse(localStorage.getItem("templates"))
-        : [
-              {
-                  name: "test",
-                  content: "merhaba benim adim !{AD}",
-              },
-          ],
-);
+const templateStore = useTemplateStore();
+const mainStore = useMainStore();
 
-const selectedTemplateIndex = ref(0);
-const selectedTemplateContent = ref("");
 const inputs = reactive({});
-const keys = ref([]);
-const newTemplateName = ref("");
 
-const detectAllKeys = (text) => {
-    const regex = /!{([^}]+)}/g;
-    const matches = text.match(regex);
-    return matches ? matches.map((match) => match.slice(2, -1)) : [];
-};
+marked.setOptions({
+    breaks: true,
+});
 
 const replaceAll = (text, values) => {
     return text.replace(/!{([^}]+)}/g, (_, key) => values[key] || `!{${key}}`);
 };
 
-const detectKeysAndGenerateReactive = () => {
-    keys.value = detectAllKeys(selectedTemplateContent.value);
-    keys.value.forEach((key) => {
-        inputs[key] = "";
-    });
-};
-
-const selectTemplate = (templateIndex) => {
-    selectedTemplateIndex.value = templateIndex;
-    selectedTemplateContent.value = rawTemplates.value[templateIndex].content;
-    detectKeysAndGenerateReactive();
-};
-
-const createNewTemplate = () => {
-    if (!newTemplateName.value.trim()) return;
-    rawTemplates.value.push({
-        name: newTemplateName.value.trim(),
-        content: "!{KEY}",
-    });
-    newTemplateName.value = "";
-    saveTemplateToLocalStorage();
-};
-
-const removeTemplate = (templateIndex) => {
-    rawTemplates.value.splice(templateIndex, 1);
-    selectedTemplateIndex.value = Math.min(
-        templateIndex,
-        rawTemplates.value.length - 1,
-    );
-    selectedTemplateContent.value =
-        rawTemplates.value[selectedTemplateIndex.value].content;
-    saveTemplateToLocalStorage();
-};
-
-const saveTemplateToLocalStorage = () => {
-    rawTemplates.value[selectedTemplateIndex.value].content =
-        selectedTemplateContent.value;
-    localStorage.setItem("templates", JSON.stringify(rawTemplates.value));
-};
-
 const generatedText = computed(() => {
-    return replaceAll(selectedTemplateContent.value, inputs);
+    return replaceAll(
+        templateStore.selectedTemplate.content.split("\\n").join("<br>"),
+        mainStore.inputs,
+    );
 });
 
 const copyGeneratedText = () => {
@@ -82,122 +35,80 @@ const copyGeneratedText = () => {
     });
 };
 
-watch(selectedTemplateContent, () => {
-    detectKeysAndGenerateReactive();
-});
+// watch(selectedTemplateContent, () => {
+//     detectKeysAndGenerateReactive();
+// });
 
 onMounted(() => {
-    selectTemplate(0);
+    console.log(templateStore.rawTemplates[0].content);
 });
-const sidebarOpen = ref(false);
-const toggleSidebar = () => {
-    sidebarOpen.value = !sidebarOpen.value;
+
+const loading = ref(false);
+const textAI = ref("");
+const promptREF = ref("");
+
+const postToAPI = async () => {
+    loading.value = true;
+    console.log(promptREF.value);
+
+    try {
+        const response = await axios.post(
+            "http://localhost:3000/api/v1/deepseek/chat",
+            {
+                message: promptREF.value,
+            },
+        );
+
+        console.log(response.data);
+        textAI.value = response.data.data;
+    } catch (error) {
+        console.error(error);
+    } finally {
+        loading.value = false;
+    }
 };
 </script>
 
 <template>
     <div class="flex min-h-screen">
-        <div
-            class="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity"
-            v-if="sidebarOpen"
-            @click="toggleSidebar"
-        ></div>
-        <div
-            :class="[
-                'fixed lg:static z-50 bg-base-200 w-64 transition-transform duration-300 ease-in-out p-2',
-                sidebarOpen ? 'translate-x-0 h-full' : '-translate-x-full',
-                'lg:translate-x-0',
-            ]"
-        >
-            <div class="divider divider-neutral">Templates</div>
-            <ul class="menu menu-lg rounded-box w-full overflow">
-                <li
-                    v-for="(template, index) in rawTemplates"
-                    :key="index"
-                    @click="selectTemplate(index)"
-                    style=""
-                >
-                    <motion.div
-                        class="flex justify-between opacity-30"
-                        :initial="{ opacity: 0 }"
-                        :animate="{ opacity: 1 }"
-                    >
-                        <p
-                            style="
-                                width: 150px;
-                                overflow: hidden;
-                                text-overflow: ellipsis;
-                                white-space: nowrap;
-                            "
-                        >
-                            {{ template.name }}
-                        </p>
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke-width="1.5"
-                            stroke="currentColor"
-                            class="size-6"
-                            @click="removeTemplate(index)"
-                        >
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                            />
-                        </svg>
-                    </motion.div>
-                </li>
-            </ul>
-            <div class="divider divider-neutral">Inputs</div>
-            <div class="flex w-full justify-center items-center flex-col gap-2">
-                <p class="text-center opacity-50" v-show="keys.length == 0">
-                    No have inputs
-                </p>
-                <div v-for="key in keys" :key="key">
-                    <input
-                        type="text"
-                        class="input"
-                        v-model="inputs[key]"
-                        :placeholder="'Type !{' + key + '}'"
-                    />
-                </div>
-            </div>
-            <div class="divider divider-neutral">Create</div>
-            <div class="flex w-full justify-center items-center flex-col gap-2">
+        <dialog id="my_modal_2" class="modal">
+            <div class="modal-box flex flex-col">
+                <h3 class="text-lg font-bold">DEEPSEEK ILE OLUSTUR</h3>
                 <input
                     type="text"
-                    placeholder="Tempalte Name"
                     class="input"
-                    v-model="newTemplateName"
+                    placeholder="WRITE PROPMPT"
+                    v-model="promptREF"
                 />
+                <button class="btn" @click="postToAPI()">SUBMIT</button>
+                <span
+                    v-if="loading"
+                    class="loading loading-spinner loading-xl"
+                ></span>
+                <p>{{ textAI }}</p>
                 <button
-                    class="btn btn-primary w-full"
-                    @click="createNewTemplate"
+                    class="btn"
+                    @click="createNewTemplate('DEEPSEEK GENERATED', textAI)"
                 >
-                    Create New Template
+                    SAVE
                 </button>
             </div>
-        </div>
-
+            <form method="dialog" class="modal-backdrop">
+                <button>close</button>
+            </form>
+        </dialog>
+        <SidebarComponent />
         <div class="flex-1 p-6 w-full">
-            <button
-                class="lg:hidden mb-4 btn btn-outline"
-                @click="toggleSidebar"
-            >
-                ☰ Menü
-            </button>
-
             <textarea
-                v-model="selectedTemplateContent"
                 class="textarea textarea-bordered w-full mb-4"
-                rows="6"
-                @blur="saveTemplateToLocalStorage"
+                rows="8"
+                v-model="templateStore.selectedTemplate.content"
+                @blur="templateStore.saveTemplateToLocalStorage"
             />
-            <div class="generated-text bg-base-200 p-4 rounded shadow">
-                {{ generatedText }}
-            </div>
+            <div
+                class="generated-text bg-base-200 p-4 rounded shadow"
+                v-html="marked.parse(generatedText)"
+            ></div>
 
             <button class="btn btn-neutral mt-5" @click="copyGeneratedText">
                 <svg
