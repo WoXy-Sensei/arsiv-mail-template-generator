@@ -1,16 +1,15 @@
 <script setup>
-import { reactive, computed, ref, onMounted, watch } from "vue";
+import { reactive, computed, ref, onMounted, watch, onUpdated } from "vue";
 import { toast } from "vue3-toastify";
 import { marked } from "marked";
 import SidebarComponent from "./components/SidebarComponent.vue";
 import axios from "axios";
 import { useTemplateStore } from "./stores/templateStore";
 import { useMainStore } from "./stores/mainStore";
+import DeepseekCreateModal from "./components/DeepseekCreateModal.vue";
 
 const templateStore = useTemplateStore();
 const mainStore = useMainStore();
-
-const inputs = reactive({});
 
 marked.setOptions({
     breaks: true,
@@ -39,69 +38,19 @@ const copyGeneratedText = () => {
 //     detectKeysAndGenerateReactive();
 // });
 
-onMounted(() => {
+onUpdated(() => {
     console.log(templateStore.rawTemplates[0].content);
 });
-
-const loading = ref(false);
-const textAI = ref("");
-const promptREF = ref("");
-
-const postToAPI = async () => {
-    loading.value = true;
-    console.log(promptREF.value);
-
-    try {
-        const response = await axios.post(
-            "http://localhost:3000/api/v1/deepseek/chat",
-            {
-                message: promptREF.value,
-            },
-        );
-
-        console.log(response.data);
-        textAI.value = response.data.data;
-    } catch (error) {
-        console.error(error);
-    } finally {
-        loading.value = false;
-    }
-};
 </script>
 
 <template>
     <div class="flex min-h-screen">
-        <dialog id="my_modal_2" class="modal">
-            <div class="modal-box flex flex-col">
-                <h3 class="text-lg font-bold">DEEPSEEK ILE OLUSTUR</h3>
-                <input
-                    type="text"
-                    class="input"
-                    placeholder="WRITE PROPMPT"
-                    v-model="promptREF"
-                />
-                <button class="btn" @click="postToAPI()">SUBMIT</button>
-                <span
-                    v-if="loading"
-                    class="loading loading-spinner loading-xl"
-                ></span>
-                <p>{{ textAI }}</p>
-                <button
-                    class="btn"
-                    @click="createNewTemplate('DEEPSEEK GENERATED', textAI)"
-                >
-                    SAVE
-                </button>
-            </div>
-            <form method="dialog" class="modal-backdrop">
-                <button>close</button>
-            </form>
-        </dialog>
+        <DeepseekCreateModal />
         <SidebarComponent />
         <div class="flex-1 p-6 w-full">
             <textarea
                 class="textarea textarea-bordered w-full mb-4"
-                rows="8"
+                rows="16"
                 v-model="templateStore.selectedTemplate.content"
                 @blur="templateStore.saveTemplateToLocalStorage"
             />

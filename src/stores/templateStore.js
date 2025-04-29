@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import { toast } from "vue3-toastify";
 
 export const useTemplateStore = defineStore("template", {
   state: () => ({
@@ -20,6 +21,16 @@ export const useTemplateStore = defineStore("template", {
       if (content === undefined) {
         content = "!{test}";
       }
+
+      const existName = this.rawTemplates.some(
+        (template) => template.name === name,
+      );
+
+      if (existName) {
+        toast.error("Template with the same name already exists");
+        return;
+      }
+
       const template = { name, content };
       this.rawTemplates.push(template);
       localStorage.setItem("templates", JSON.stringify(this.rawTemplates));

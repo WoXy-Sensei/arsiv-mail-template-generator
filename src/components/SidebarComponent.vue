@@ -1,15 +1,12 @@
 <script setup>
-import { ref, reactive, watch, onMounted } from "vue";
+import { ref, reactive, watch, onMounted, onUpdated } from "vue";
 import { motion } from "motion-v";
 import { useTemplateStore } from "../stores/templateStore";
 import { useMainStore } from "../stores/mainStore";
 
-import { storeToRefs } from "pinia";
-
 const templateStore = useTemplateStore();
 const mainStore = useMainStore();
 
-const { getSelectedTemplateContent } = storeToRefs(templateStore);
 const sidebarOpen = ref(false);
 
 const newTemplateName = ref("");
@@ -40,21 +37,27 @@ const detectKeysAndGenerateReactive = () => {
     mainStore.setInputs(inputs);
 };
 
-watch(getSelectedTemplateContent, () => {
-    detectKeysAndGenerateReactive();
-    console.log(mainStore.keys);
-});
+watch(
+    () => templateStore.selectedTemplateIndex,
+    () => {
+        detectKeysAndGenerateReactive();
+    },
+    { immediate: true },
+);
 
 onMounted(() => {
     templateStore.initialize();
     detectKeysAndGenerateReactive();
 });
+
+onUpdated(() => {
+    console.log("udapte");
+});
 </script>
 
 <template>
-    {{ templateStore.selectedTemplateIndex }}
     <div
-        class="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity"
+        class="lg:hidden fixed inset-0 bg-black opacity-70 z-40 transition-opacity"
         v-if="sidebarOpen"
         @click="toggleSidebar"
     ></div>
@@ -90,6 +93,7 @@ onMounted(() => {
                             overflow: hidden;
                             text-overflow: ellipsis;
                             white-space: nowrap;
+                            font-size: 16px;
                         "
                         @click="templateStore.selectTemplate(index)"
                     >
